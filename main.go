@@ -64,6 +64,7 @@ func main() {
 			if isMentioned {
 				userId := event.UserID
 				text := request.Param("text")
+				text = strings.ReplaceAll(text, "<@"+auth.UserID+">", "")
 
 				// Hit Gemini API
 				resp, err := model.GenerateContent(context.Background(), genai.Text(text))
