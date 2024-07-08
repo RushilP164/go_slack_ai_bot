@@ -10,12 +10,13 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
 	"github.com/shomali11/slacker"
+	"github.com/slack-go/slack/slackevents"
 	"google.golang.org/api/option"
 )
 
 // func printCommandEvents(analyticsChannel <-chan *slacker.CommandEvent) {
 // 	for event := range analyticsChannel {
-// 		fmt.Println("Command Evenets")
+// 		fmt.Println("Command Events")
 // 		fmt.Println(event.Timestamp)
 // 		fmt.Println(event.Command)
 // 		fmt.Println(event.Parameters)
@@ -45,6 +46,10 @@ func main() {
 	client := connectGemini()
 	defer client.Close()
 	model := client.GenerativeModel("gemini-pro")
+	// // This might work in paid versions.
+	// model.SystemInstruction = &genai.Content{
+	// 	Parts: []genai.Part{genai.Text("Act as an expert in IT, Software Engineering & all related field who is capable to provide solution to any kind of problems of any kind of IT company. Apart from the general greeting, if the question is out of these areas deny to answer it smartly & in a formal way.")},
+	// }
 
 	// // Printig command details
 	// go printCommandEvents(bot.CommandEvents())
@@ -53,24 +58,22 @@ func main() {
 		Description: "AI Bot",
 		Handler: func(botCtx slacker.BotContext, request slacker.Request, response slacker.ResponseWriter) {
 			event := botCtx.Event()
-			auth, _ := botCtx.APIClient().AuthTest()
-
-			isMentioned := strings.Contains(event.Text, "<@"+auth.UserID+">")
-
-			/**
-			We only want to respond if app is mentioned.
-			ToDo: Find some in build way to do it.
-			*/
-			if isMentioned {
+			if _, ok := event.Data.(*slackevents.AppMentionEvent); ok {
+				auth, _ := botCtx.APIClient().AuthTest()
+				// isMentioned := strings.Contains(event.Text, "<@"+auth.UserID+">")
 				userId := event.UserID
 				text := request.Param("text")
 				text = strings.ReplaceAll(text, "<@"+auth.UserID+">", "")
+				if text == "" {
+					text = "Hello"
+				}
 
 				// Hit Gemini API
 				resp, err := model.GenerateContent(context.Background(), genai.Text(text))
 				if err != nil {
 					response.Reply(fmt.Sprintf("<@%s>, %v", userId, err))
 					log.Println("Error: ", err)
+					return
 				}
 
 				// Return data to slack
